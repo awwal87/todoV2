@@ -12,21 +12,34 @@ typedef struct {
 
 ChoreName *choreArr = NULL;
 
-int createNew(char *command, int choreCount) {
+int updateList(char *command, int choreCount) {
     FILE *f;
     if (strcmp(command, "new") == 0) {
 	printf("Creating new.... \n");
 	f = fopen(filename, "wb");
-	if (!f) {
-	    perror("Error creating file");
-	    return 0;
-	    }
 	}
-    else return 0;
+    else if (strcmp(command, "add") == 0) {
+	printf("Adding new items.... \n");
+	f = fopen(filename, "ab");
+	}
+        
+    if (!f) {
+	perror("Error creating file");
+	return 0;
+	}
     
     int i = 0;
     uint32_t len;
+    
+    ChoreName chore;
+    int size = sizeof(chore.choreName)/sizeof(chore.choreName[0]);
+    
     while ((len = strlen(choreArr[i].choreName))) {
+	if (len == size) choreArr[i].choreName[len - 1] = '\0';
+	else {
+	    choreArr[i].choreName[len] = '\0';
+	    len++;
+	    }
 	fwrite(&len, sizeof(uint32_t), 1, f);
 	fwrite(choreArr[i].choreName, sizeof(char), len, f);
 	i++;
@@ -48,7 +61,6 @@ int viewList(void) {
     
     while (fread(&len, sizeof(uint32_t), 1, f)) {
 	fread(chore.choreName, sizeof(char), len, f);
-	chore.choreName[len] = '\0';
 	printf("%d:\t%s \n", i, chore.choreName);
 	i++;
 	}
@@ -88,10 +100,10 @@ char *delete(char *taskNo) {
 	return NULL;
 	}
     
-    int i = 1;
+    int i = 0;
     uint32_t len;
     while (fread(&len, sizeof(uint32_t), 1, f1)) {
-	if (itemNo == i) {
+	if (itemNo == (i+1)) {
 	    i++;
 	    fread(chore.choreName, sizeof(char), len, f1);
 	    strcpy(deletedItem, chore.choreName);
@@ -103,6 +115,10 @@ char *delete(char *taskNo) {
 	    fwrite(chore.choreName, sizeof(char), len, f2);
 	    i++;
 	    }
+	}
+    
+    if (itemNo > i) {
+	strcpy(deletedItem, "DNE");
 	}
     
     fclose(f1);
@@ -131,30 +147,46 @@ int main(int argc, char **argv) {
 	}
     
     int success;
-    if (strcmp(argv[1], "new") == 0) {
-	success = createNew(argv[1], argc - 2);
+    int new, add;
+    new = strcmp(argv[1], "new");
+    add = strcmp(argv[1], "add");
+    if (new == 0 || add == 0) {
+	success = updateList(argv[1], argc - 2);
 	if (!success) {
-	    printf("Invalid command \n");
+	    printf("Program terminated. \n");
 	    }
 	else {
-	    printf("%d tasks added successfully. \n", argc - 2);
-	    for (int i = 0; i < argc - 2; i++) {
-		printf("%s \n", choreArr[i].choreName);
+	    if (new == 0) {
+		printf("New list created. \n");
+		for (int i = 0; i < argc - 2; i++) {
+		    printf("%d:\t%s \n", i+1, choreArr[i].choreName);
+		    }
+		}
+	    if (add == 0) {
+		printf("%d task(s) added successfully. \n", argc - 2);
+		viewList();
 		}
 	    }
 	}
     
     else if (strcmp(argv[1], "view") == 0) {
-	viewList();
+	int success = viewList();
+	if (!success) printf("Program terminated. \n");
 	}
 
     else if (strcmp(argv[1], "delete") == 0) {
-	char *deletedItem = delete(argv[2]);
 	char *itemNo = argv[2];
-	if (itemNo != NULL) {
-	    printf("Deleted item no. %s: %s \n", itemNo, deletedItem);
-	    free(deletedItem);
+	char *deletedItem = delete(itemNo);
+	if (strcmp(deletedItem, "DNE") == 0) {
+	    printf("Item %s does not exist. \n", itemNo);
 	    }
+	else if (deletedItem == NULL) {
+	    printf("Program terminated \n");
+	    }
+	else {
+	    printf("Deleted item %s: %s \n", itemNo, deletedItem);
+	    }
+	free(deletedItem);
 	}
     
     else printf("Unknown command. \n");
