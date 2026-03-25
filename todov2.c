@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <errno.h>
 
-#define SUCCESS 1
-#define FAILURE 0
-
 const char *filename = "data.bin";
 
 typedef struct {
@@ -60,9 +57,9 @@ int viewList(void) {
     return 1;
     }
 
-int delete(char *taskNo) {
-    ChoreName chore;
-    char *endptr;
+char *delete(char *taskNo) {
+    ChoreName chore;    
+    char *endptr, *deletedItem;
     const char *tempFile = "temp.bin";
     errno = 0;
     
@@ -70,28 +67,34 @@ int delete(char *taskNo) {
     
     if (errno != 0) {
 	perror("Conversion failed");
-	return 0;
+	return NULL;
 	}    
     if (endptr == taskNo) {
 	printf("Invalid item no. \n");
-	return 0;
+	return NULL;
 	}
     
     FILE *f1, *f2; 
     f1 = fopen(filename, "rb");
     f2 = fopen(tempFile, "wb");
-    
-    if (!f1 || !f2) {
-	perror("Failed to open file");
-	return 0;
+    deletedItem = malloc(sizeof(ChoreName));
+        
+    if (!f1 || !f2 || !deletedItem) {
+	if (!f1 || !f2) perror("Failed to open file");
+	if (!deletedItem) perror("Memory allocation failed");
+	if (f1) fclose(f1);
+	if (f2) fclose(f2);
+	if (deletedItem) free(deletedItem);
+	return NULL;
 	}
     
     int i = 1;
-    uint32_t len;    
+    uint32_t len;
     while (fread(&len, sizeof(uint32_t), 1, f1)) {
 	if (itemNo == i) {
 	    i++;
 	    fread(chore.choreName, sizeof(char), len, f1);
+	    strcpy(deletedItem, chore.choreName);
 	    continue;
 	    }
 	else {
@@ -107,7 +110,7 @@ int delete(char *taskNo) {
     remove(filename);
     rename(tempFile, filename);
     
-    return itemNo;
+    return deletedItem;
     }
 
 int main(int argc, char **argv) {
@@ -146,8 +149,12 @@ int main(int argc, char **argv) {
 	}
 
     else if (strcmp(argv[1], "delete") == 0) {
-	int itemNo = delete(argv[2]);
-	if (itemNo != FAILURE) printf("Deleted item no. %d \n", itemNo);
+	char *deletedItem = delete(argv[2]);
+	char *itemNo = argv[2];
+	if (itemNo != NULL) {
+	    printf("Deleted item no. %s: %s \n", itemNo, deletedItem);
+	    free(deletedItem);
+	    }
 	}
     
     else printf("Unknown command. \n");
