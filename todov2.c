@@ -2,8 +2,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <errno.h>
 
-const char* filename = "data.bin";
+#define SUCCESS 1
+#define FAILURE 0
+
+const char *filename = "data.bin";
 
 typedef struct {
     char choreName[64];
@@ -36,6 +40,7 @@ int createNew(char *command, int choreCount) {
     }
 
 int viewList(void) {
+    ChoreName chore;
     FILE *f = fopen(filename, "rb");
     if (!f) {
 	perror("Error opening file");
@@ -45,15 +50,64 @@ int viewList(void) {
     int i = 1;
     
     while (fread(&len, sizeof(uint32_t), 1, f)) {
-	fread(choreArr->choreName, sizeof(char), len, f);
-	if (len < 64) choreArr->choreName[len] = '\0';
-	else choreArr->choreName[len - 1] = '\0';
-	printf("%d:\t%s \n", i, choreArr->choreName);
+	fread(chore.choreName, sizeof(char), len, f);
+	chore.choreName[len] = '\0';
+	printf("%d:\t%s \n", i, chore.choreName);
 	i++;
 	}
     
     fclose(f);
     return 1;
+    }
+
+int delete(char *taskNo) {
+    ChoreName chore;
+    char *endptr;
+    const char *tempFile = "temp.bin";
+    errno = 0;
+    
+    int itemNo = (int)strtol(taskNo, &endptr, 10);
+    
+    if (errno != 0) {
+	perror("Conversion failed");
+	return 0;
+	}    
+    if (endptr == taskNo) {
+	printf("Invalid item no. \n");
+	return 0;
+	}
+    
+    FILE *f1, *f2; 
+    f1 = fopen(filename, "rb");
+    f2 = fopen(tempFile, "wb");
+    
+    if (!f1 || !f2) {
+	perror("Failed to open file");
+	return 0;
+	}
+    
+    int i = 1;
+    uint32_t len;    
+    while (fread(&len, sizeof(uint32_t), 1, f1)) {
+	if (itemNo == i) {
+	    i++;
+	    fread(chore.choreName, sizeof(char), len, f1);
+	    continue;
+	    }
+	else {
+	    fread(chore.choreName, sizeof(char), len, f1);
+	    fwrite(&len, sizeof(uint32_t), 1, f2);
+	    fwrite(chore.choreName, sizeof(char), len, f2);
+	    i++;
+	    }
+	}
+    
+    fclose(f1);
+    fclose(f2);
+    remove(filename);
+    rename(tempFile, filename);
+    
+    return itemNo;
     }
 
 int main(int argc, char **argv) {
@@ -62,7 +116,8 @@ int main(int argc, char **argv) {
 	return 1;
 	}
     
-    choreArr = malloc(sizeof(ChoreName) * (argc - 2));
+    uint32_t allocdMem = sizeof(ChoreName) * (argc - 2);
+    choreArr = malloc(allocdMem);
     if (!choreArr) {
 	perror("Memory allocation failed");
 	return 1;
@@ -85,23 +140,17 @@ int main(int argc, char **argv) {
 		}
 	    }
 	}
+    
     else if (strcmp(argv[1], "view") == 0) {
 	viewList();
 	}
+
+    else if (strcmp(argv[1], "delete") == 0) {
+	int itemNo = delete(argv[2]);
+	if (itemNo != FAILURE) printf("Deleted item no. %d \n", itemNo);
+	}
+    
     else printf("Unknown command. \n");
+    free(choreArr);
     return 0;
     }
-/*
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
- * */
